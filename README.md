@@ -5,6 +5,10 @@
 - 상세 아키텍처 및 개발 환경 계획은 `docs/monorepo-plan.md` 참고
 - 개발 환경 설정 방법은 각 디렉터리별 README에서 안내 예정
 
+## 문서
+* [모노레포 설계 문서](docs/monorepo-plan.md)
+* [공통 개발 가이드](docs/development-guide.md)
+
 ## 디렉터리 개요
 | 폴더 | 설명 |
 |-------|------|
