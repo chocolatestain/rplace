@@ -1,0 +1,190 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Technical Requirements Document (TRD)
+
+## 1. Executive Technical Summary
+- **프로젝트 개요**  
+  r/place 형태의 실시간 픽셀 협업 캔버스를 React SPA + Spring Boot 백엔드로 구현한다. Redis in-memory cache와 MySQL RDS를 조합해 실시간성과 영속성을 모두 확보하며, AWS Fargate 기반 컨테이너 오케스트레이션으로 최소 운영 부담과 자동 확장을 달성한다.
+
+- **핵심 기술 스택**  
+  React 18 · Redux Toolkit / Spring Boot 3.x · Java 17 / MySQL 8 / Redis 7 · PubSub / AWS ECS Fargate · S3 · CloudFront / GitHub Actions CI-CD
+
+- **주요 기술 목표**  
+  ‑ WebSocket 지연 ≤ 300 ms (동시 1 k)  
+  ‑ REST API 지연 ≤ 200 ms (p95)  
+  ‑ 99.9 % 가용성, TPS 10 k 버스트 대응  
+  ‑ 배포 후 롤백 ≤ 2 분, 데이터 RPO ≤ 5 분
+
+- **중요 기술 가정**  
+  ‑ 1차 릴리스 동시 사용자 최대 5 k, 추후 수평 확장 전제  
+  ‑ AWS 관리형 서비스 우선 사용, 온프레미스 요구 없음  
+  ‑ 지정 스택(React/Spring/MySQL/Redis) 고정, 변동 없음  
+
+---
+
+## 2. Technology Stack Architecture
+
+### Frontend Technology Stack
+- **코어 프레임워크**: React 18, TypeScript 5
+- **상태 관리**: Redux Toolkit + RTK Query (픽셀‧쿨다운 캐싱)
+- **라우팅**: React Router v6
+- **UI/UX 프레임워크**: MUI v5 + Emotion CSS-in-JS
+- **빌드 도구**: Vite 5 (dev server + HMR) · ESLint + Prettier · Jest + React Testing Library
+
+### Backend Technology Stack
+- **런타임**: OpenJDK 17 (LTS)
+- **웹 프레임워크**: Spring Boot 3 · Spring WebFlux (REST) · Spring WebSocket
+- **API 디자인**: REST (HTTP/JSON) + WebSocket (STOMP over SockJS)
+- **입력 검증**: Hibernate Validator (JSR 380) + DTO 패턴
+- **미들웨어 컴포넌트**: Spring Security (JWT), Micrometer (관측), Logback (로깅)
+
+### Database & Persistence Layer
+- **주 데이터베이스**: MySQL 8 (AWS RDS Multi-AZ) — 관계형 무결성, point-in-time recovery
+- **스키마 설계**: 픽셀(x,y UNIQUE), 사용자, 픽셀 히스토리; 3NF 기본, 고빈도 쓰기 테이블 파티셔닝 미적용(초기 규모 기준)
+- **캐싱**: Redis ElastiCache Cluster 모드, Hash 구조로 canvas:current_state, TTL 쿨다운 Key
+- **데이터 마이그레이션**: Flyway 버전 관리
+- **백업/복구**: RDS 자동 스냅샷(30일), S3 장기 저장; Redis AOF 매 1 분
+
+### Infrastructure & DevOps
+- **호스팅**: AWS — ECS Fargate(백), S3 + CloudFront(정적), ALB(TLS)
+- **컨테이너화**: Docker Compose(로컬) → ECR 이미지 배포
+- **CI/CD**: GitHub Actions — PR 단위 테스트 → main merge 시 Blue/Green 배포
+- **모니터링**: CloudWatch + ECS Container Insights · Sentry (프론트·백)
+- **로깅**: JSON 로그 → CloudWatch Logs → Loki/Grafana (선택)
+
+---
+
+## 3. System Architecture Design
+
+### Top-Level Building Blocks
+- 프론트엔드 SPA  
+  ‑ React UI, WebSocket 클라이언트, JWT 관리
+- API Gateway / ALB  
+  ‑ HTTPS 종단, 경로 기반 라우팅(/api, /ws)
+- Spring Boot 백엔드  
+  ‑ REST API, WebSocket, 쿨다운 로직
+- Redis Cluster  
+  ‑ 실시간 픽셀 Hash, Pub/Sub 브로드캐스트, 쿨다운 TTL
+- MySQL RDS  
+  ‑ 영속 스냅샷, 트랜잭션 보존
+- S3 + CloudFront  
+  ‑ 정적 리소스·타임랩스 파일 서빙
+
+### Top-Level Component Interaction Diagram
+```mermaid
+graph TD
+    A[React SPA] -- HTTPS --> B(ALB)
+    B --> C[Spring Boot API]
+    C -- JDBC --> D[MySQL RDS]
+    C -- Redis Client --> E[Redis Cluster]
+    E -- Pub/Sub --> C
+    C -- WebSocket --> A
+```
+- React SPA는 ALB를 통해 REST API 및 WebSocket 엔드포인트에 연결한다.  
+- Spring Boot 인스턴스는 Redis에 픽셀 업데이트 후 Pub/Sub으로 다른 인스턴스와 동기화한다.  
+- MySQL은 주기적 배치 또는 비동기 Queue로 Redis 데이터를 영속화한다.  
+- CloudFront는 S3 정적 파일과 /ws 엔드포인트를 제외한 모든 리소스를 캐싱한다.
+
+### Code Organization & Convention
+
+**Domain-Driven Organization Strategy**
+- 픽셀, 사용자, 관리자, 공용(shared) 바운디드 컨텍스트 구분
+- Layered 패턴: controller → service → repository → entity  
+- 공용 유틸, 예외, 보안 모듈은 shared 폴더에 통합
+
+**Universal File & Folder Structure**
+```
+/root-monorepo
+├── frontend/
+│   ├── src/
+│   │   ├── domains/
+│   │   │   ├── canvas/
+│   │   │   │   ├── components/
+│   │   │   │   ├── hooks/
+│   │   │   │   └── slice.ts
+│   │   │   └── auth/
+│   │   ├── app/
+│   │   ├── shared/
+│   │   └── index.tsx
+│   └── vite.config.ts
+├── backend/
+│   ├── src/main/java/com/example/
+│   │   ├── canvas/
+│   │   │   ├── controller/
+│   │   │   ├── service/
+│   │   │   ├── domain/
+│   │   │   └── infra/
+│   │   ├── user/
+│   │   ├── admin/
+│   │   └── shared/
+│   └── src/main/resources/
+├── database/
+│   └── migration/ (Flyway .sql)
+└── infrastructure/
+    ├── docker/
+    ├── terraform/ (선택)
+    └── cicd/
+```
+
+### Data Flow & Communication Patterns
+- **클라이언트-서버**: POST /api/pixel → JWT 검증 → 서비스 로직 → 200 응답  
+- **DB 인터랙션**: Spring Data JPA + HikariCP 풀, 트랜잭션 @Transactional  
+- **외부 서비스**: Google OAuth → Spring Security OAuth2, SES 메일 발송  
+- **실시간 통신**: /ws/canvas 채널 STOMP 메시지; 서버 → 클라이언트 브로드캐스트  
+- **데이터 동기화**: Redis Write-Through → Async Scheduler(1 min)로 MySQL flush
+
+---
+
+## 4. Performance & Optimization Strategy
+- Redis Hash + Pipeline으로 초당 10 k 픽셀 쓰기 처리, MySQL 부하 분산  
+- WebSocket 세션당 Δ픽셀만 전송해 네트워크 트래픽 최소화  
+- ALB + CloudFront 캐싱으로 정적 리소스 TTFB 단축  
+- HikariCP 최대 pool size=2×vCPU로 DB 커넥션 효율화
+
+---
+
+## 5. Implementation Roadmap & Milestones
+
+### Phase 1: Foundation (MVP)
+- 인프라: VPC, RDS, Redis, ECS Fargate 클러스터  
+- 핵심 기능: 캔버스 표시·픽셀 그리기·쿨다운·실시간 동기화  
+- 보안: JWT 로그인, HTTPS, 기본 RBAC  
+- 개발 환경: Monorepo, Vite HMR, GitHub Actions CI  
+- 일정: 6 주
+
+### Phase 2: Feature Enhancement
+- 추가 기능: OAuth2, 프로필, 모바일 반응형, 관리자 대시보드  
+- 성능 개선: Redis Cluster Shard, MySQL Read Replica  
+- 보안 강화: WAF, rate-limit, 이미지 필터링 Lambda  
+- 모니터링: Sentry Alert→Slack, Grafana Dashboard  
+- 일정: 8 주
+
+### Phase 3: Scaling & Optimization
+- 확장: 멀티 캔버스 샤딩, WebSocket Server Auto Scaling Policy  
+- 고급 통합: 타임랩스 자동 렌더링 Batch, SNS/SQS Event Queue  
+- 엔터프라이즈: 감사 로그, GDPR 데이터 삭제 API  
+- 컴플라이언스: KISA ISMS 준수 문서화  
+- 일정: 12 주
+
+---
+
+## 6. Risk Assessment & Mitigation Strategies
+
+### Technical Risk Analysis
+- **기술 리스크**: Redis 단일 장애 → Cluster 모드 + Multi AZ  
+- **성능 리스크**: WebSocket 과부하 → 세션 분산, idle timeout  
+- **보안 리스크**: JWT 탈취 → 짧은 TTL + Refresh Token Rotate  
+- **통합 리스크**: SES 발송 한도 → 사전 리밋 증설 요청  
+- **완화 전략**: Chaos 테스트, Auto Recovery Script, Canary 배포
+
+### Project Delivery Risks
+- **일정 리스크**: 실시간 로직 난이도 → MVP 범위 고정, 스파이크 테스트  
+- **자원 리스크**: 프론트·백 풀스택 인력 부족 → 모듈별 병렬 개발  
+- **품질 리스크**: 테스트 커버리지 저조 → E2E Cypress, 백엔드 Testcontainers  
+- **배포 리스크**: 잘못된 컨테이너 이미지 → 이미지 서명 + 취소 스위치  
+- **비상 계획**: 기능 플래그, 데이터 스냅샷, 롤백 플레이북
+
+---

@@ -1,0 +1,162 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Code Guideline Document
+
+---
+
+## 1. Project Overview
+
+This project is a real-time collaborative pixel art platform, architected as a React 18 + TypeScript SPA frontend and a Spring Boot 3.x + Java 17 backend, with MySQL 8 (AWS RDS) for persistence and Redis 7 for in-memory operations and pub/sub. The system is deployed on AWS ECS Fargate, utilizes S3 + CloudFront for static assets, and follows a monorepo structure for unified management. Key architectural decisions include domain-driven organization, layered backend structure, Redux Toolkit for state management, REST + WebSocket APIs, and rigorous CI/CD via GitHub Actions.
+
+---
+
+## 2. Core Principles
+
+1. **Clarity and Explicitness:** All code MUST be self-explanatory and avoid implicit side effects.
+2. **Single Responsibility:** Each module, class, or function MUST have one clear purpose.
+3. **Fail Fast and Safe:** All errors MUST be handled explicitly and logged appropriately.
+4. **Consistency:** Code style, naming, and structure MUST be uniform across the codebase.
+5. **Testability:** All business logic MUST be covered by automated tests.
+
+---
+
+## 3. Language-Specific Guidelines
+
+### 3.1 Frontend (React 18 + TypeScript 5 + Redux Toolkit)
+
+#### File Organization and Directory Structure
+
+- **MUST:** Follow `/src/domains/{domain}/{components|hooks|slice.ts}` structure.
+- **MUST:** Place shared utilities under `/src/shared`.
+- **MUST NOT:** Place unrelated components or logic in a single file or folder.
+
+```typescript
+// MUST: Canvas domain structure
+/src/domains/canvas/
+  components/
+    Canvas.tsx
+  hooks/
+    useCanvasSync.ts
+  slice.ts
+```
+
+#### Import/Dependency Management
+
+- **MUST:** Use absolute imports from `src/` base.
+- **MUST:** Group external, internal, and style imports separately.
+- **MUST NOT:** Use wildcard (`*`) imports or import unused modules.
+
+```typescript
+// MUST: Import order
+import React from 'react';
+import { useSelector } from 'react-redux';
+import { Canvas } from 'domains/canvas/components/Canvas';
+import 'shared/styles/global.css';
+```
+
+#### Error Handling Patterns
+
+- **MUST:** Wrap all async logic (e.g., API calls, WebSocket events) in try/catch.
+- **MUST:** Show user-friendly error UI for all recoverable errors.
+- **MUST:** Log errors to Sentry via a centralized error boundary.
+
+```typescript
+// MUST: Error boundary example
+import { ErrorBoundary } from 'react-error-boundary';
+
+<ErrorBoundary fallback={<ErrorFallback />}>
+  <App />
+</ErrorBoundary>
+```
+
+---
+
+### 3.2 Backend (Spring Boot 3.x + Java 17)
+
+#### File Organization and Directory Structure
+
+- **MUST:** Use `com.example.{domain}.{layer}` structure.
+- **MUST:** Separate `controller`, `service`, `domain`, and `infra` layers.
+- **MUST:** Place shared utilities and exceptions in `shared`.
+
+```java
+// MUST: Canvas domain structure
+com.example.canvas.controller.CanvasController
+com.example.canvas.service.CanvasService
+com.example.canvas.domain.Pixel
+com.example.canvas.infra.RedisPixelRepository
+```
+
+#### Import/Dependency Management
+
+- **MUST:** Use explicit imports; avoid wildcard imports.
+- **MUST:** Use dependency injection via constructor for all beans.
+- **MUST NOT:** Inject dependencies via field injection.
+
+```java
+// MUST: Constructor injection
+@Service
+public class CanvasService {
+    private final PixelRepository pixelRepository;
+
+    public CanvasService(PixelRepository pixelRepository) {
+        this.pixelRepository = pixelRepository;
+    }
+}
+```
+
+#### Error Handling Patterns
+
+- **MUST:** Use `@ControllerAdvice` for global exception handling.
+- **MUST:** Return standardized error responses (e.g., `ErrorResponse` DTO).
+- **MUST:** Log all server errors with contextual information.
+
+```java
+// MUST: Global exception handler
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(PixelNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(PixelNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(new ErrorResponse("PIXEL_NOT_FOUND", ex.getMessage()));
+    }
+}
+```
+
+---
+
+## 4. Code Style Rules
+
+### 4.1 MUST Follow
+
+1. **TypeScript:** Always use explicit types for function parameters and return values to prevent type inference errors.
+2. **React:** Use functional components and React hooks exclusively for all new code. Avoid class components.
+3. **Redux Toolkit:** Use slices per domain, colocate actions and reducers, and use RTK Query for API state.
+4. **Java:** Use Java 17 features (e.g., records, switch expressions) where appropriate for clarity and brevity.
+5. **Spring Boot:** Use DTOs for all API input/output. Validate input with Hibernate Validator annotations.
+6. **SQL:** Use parameterized queries or JPA methods to prevent SQL injection.
+
+#### Rationale
+
+- Explicit types and DTOs prevent runtime errors and improve maintainability.
+- Functional components and hooks are the modern React standard.
+- Slices and RTK Query enforce modular, maintainable state.
+- Java 17 features reduce boilerplate.
+- Input validation and parameterized queries are essential for security.
+
+```typescript
+// MUST: Explicit typing
+function setPixel(x: number, y: number, color: string): SetPixelAction {
+  return { type: 'SET_PIXEL', payload: { x, y, color } };
+}
+```
+
+```java
+// MUST: DTO with validation
+public record SetPixelRequest(
+    @NotNull @Min(0) Integer x,
+    @NotNull @Min(0) Integer y,
+    @NotNull @Pattern(regexp = "#[0-9
