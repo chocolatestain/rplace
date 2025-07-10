@@ -1,12 +1,13 @@
 import React from 'react';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import theme from './shared/theme';
+import CanvasLayout from './domains/canvas/components/CanvasLayout';
 
-function App() {
-  return (
-    <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-      <h1>r/place 캔버스 프로젝트</h1>
-      <p>초기 셋업 완료!</p>
-    </div>
-  );
-}
+const App: React.FC = () => (
+  <ThemeProvider theme={theme}>
+    <CssBaseline />
+    <CanvasLayout />
+  </ThemeProvider>
+);
 
 export default App; 
