@@ -7,10 +7,12 @@ import org.springframework.stereotype.Service;
 import com.example.canvas.domain.Pixel;
 import com.example.canvas.domain.PixelHistory;
 import com.example.canvas.domain.PixelKey;
+import com.example.canvas.dto.PixelEvent;
 import com.example.canvas.dto.SetPixelRequest;
 import com.example.canvas.repository.PixelHistoryRepository;
 import com.example.canvas.repository.PixelRepository;
 import com.example.shared.cooldown.CooldownService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.transaction.Transactional;
 
@@ -20,13 +22,19 @@ public class CanvasService {
     private final PixelRepository pixelRepository;
     private final PixelHistoryRepository historyRepository;
     private final CooldownService cooldownService;
+    private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     public CanvasService(PixelRepository pixelRepository,
                          PixelHistoryRepository historyRepository,
-                         CooldownService cooldownService) {
+                         CooldownService cooldownService,
+                         org.springframework.data.redis.core.StringRedisTemplate redisTemplate,
+                         ObjectMapper objectMapper) {
         this.pixelRepository = pixelRepository;
         this.historyRepository = historyRepository;
         this.cooldownService = cooldownService;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -49,7 +57,14 @@ public class CanvasService {
         PixelHistory history = new PixelHistory(request.x(), request.y(), request.color(), userId, now);
         historyRepository.save(history);
 
-        // TODO publish redis event for websocket broadcast (subtask 3)
+        try {
+            PixelEvent event = new PixelEvent(request.x(), request.y(), request.color(), userId);
+            String json = objectMapper.writeValueAsString(event);
+            redisTemplate.convertAndSend("canvas:pixel", json);
+        } catch (Exception e) {
+            // TODO: 로깅 프레임워크로 교체
+            e.printStackTrace();
+        }
         return cd;
     }
 } 
