@@ -97,3 +97,17 @@ CRUD 이벤트 로그용. 고속 쓰기 대비 별도 ID PK.
 1. `database/migration/V1__init.sql` 작성 → DB-TODO-005
 2. `application.yml`에 Flyway 경로 설정(backend)
 3. CI 파이프라인에 `./gradlew flywayMigrate` 테스트 단계 추가(추후) 
+
+## 7. 테스트 전략(통합)
+- **Testcontainers + MySQL 8**를 사용해 CI 환경에서도 실제 MySQL 인스턴스로 마이그레이션 검증
+- `FlywayMigrationTest`가 스프링 컨텍스트를 기동하며 컨테이너 JDBC 정보를 동적으로 주입
+- CI 워크플로 `backend` 잡에서 `./gradlew test` 단계로 자동 수행 
+
+규칙 파일을 내려받기 위한 CLI 명령이 준비되었습니다.  
+프로젝트 루트( `rplace` )에서 아래 명령을 실행해 주시면 규칙이 최신 상태로 동기화됩니다.
+
+```
+npx @vooster/cli@latest rules:init --agent cursor --api-key <YOUR_API_KEY>
+```
+
+(위 `YOUR_API_KEY` 자리에 본인의 Vooster API 키를 입력해 주세요) 

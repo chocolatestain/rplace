@@ -43,3 +43,7 @@ jobs:
         run: |
           cd backend
           ./gradlew build --no-daemon 
+      - name: Test
+        run: |
+          cd backend
+          ./gradlew test --no-daemon 
