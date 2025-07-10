@@ -31,8 +31,9 @@ public class CanvasService {
 
     @Transactional
     public int setPixel(SetPixelRequest request, long userId) {
-        // enforce cooldown (5s default, TODO adjust for logged-in user)
-        int cd = cooldownService.enforceCooldown(userId, 5);
+        // 로그인 사용자는 기본 쿨다운 3초, 비로그인은 5초 적용
+        int baseCooldown = (userId != 0) ? 3 : 5;
+        int cd = cooldownService.enforceCooldown(userId, baseCooldown);
 
         PixelKey key = new PixelKey(request.x(), request.y());
         LocalDateTime now = LocalDateTime.now();
