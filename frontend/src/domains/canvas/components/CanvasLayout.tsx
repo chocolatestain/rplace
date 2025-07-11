@@ -1,10 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Grid, Box } from '@mui/material';
+import { Grid, Box, Alert, CircularProgress, Typography } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../../shared/store';
 import { setPixel } from '../slice';
 import PalettePanel from './PalettePanel';
 import TimerPanel from './TimerPanel';
+import { usePixelApi } from '../hooks/usePixelApi';
+import { useCanvasSocket } from '../hooks/useCanvasSocket';
+import { getJwtToken, isGuest } from '../../../shared/jwt';
 
 const CANVAS_SIZE = 800;
 const GRID_SIZE = 200; // 200x200 바둑판
@@ -17,6 +20,8 @@ const CanvasLayout: React.FC = () => {
     (state: RootState) => state.canvas
   );
   const [isDrawing, setIsDrawing] = useState(false);
+  const jwtToken = getJwtToken();
+  const { setPixel: apiSetPixel, loading, error, cooldown } = usePixelApi(jwtToken || undefined);
 
   // 캔버스 렌더링
   useEffect(() => {
@@ -38,6 +43,24 @@ const CanvasLayout: React.FC = () => {
       }
     }
   }, [pixels]);
+
+  // 실시간 픽셀 이벤트 수신 시 상태 갱신
+  useCanvasSocket({
+    jwtToken: jwtToken || undefined,
+    onPixelEvent: (event) => {
+      // 서버에서 { x, y, color } 등 픽셀 정보 브로드캐스트 시 상태 갱신
+      if (event && typeof event.x === 'number' && typeof event.y === 'number' && typeof event.color === 'string') {
+        dispatch(setPixel({ x: event.x, y: event.y, color: event.color }));
+      }
+    },
+  });
+
+  // 쿨다운 동기화(REST 응답/에러, 실시간 등)
+  useEffect(() => {
+    if (cooldown > 0) {
+      dispatch({ type: 'canvas/setCooldownRemaining', payload: cooldown });
+    }
+  }, [cooldown, dispatch]);
 
   // 마우스 이벤트 처리
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -63,7 +86,9 @@ const CanvasLayout: React.FC = () => {
     const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE);
     // 바둑판 범위 체크
     if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-      dispatch(setPixel({ x, y, color: selectedColor }));
+      // REST API 호출(쿨다운, 에러, 인증 분기)
+      apiSetPixel({ x, y, color: selectedColor });
+      // (실시간 반영은 WebSocket에서 수신 시 처리)
     }
   };
 
@@ -79,8 +104,18 @@ const CanvasLayout: React.FC = () => {
         xs={12}
         md={8}
         order={{ xs: 2, md: 2 }}
-        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}
       >
+        {/* 로딩 인디케이터 */}
+        {loading && <CircularProgress sx={{ mb: 2 }} />}
+        {/* 에러 메시지 */}
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {/* 쿨다운 안내 */}
+        {cooldownRemaining > 0 && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            쿨다운 중: {cooldownRemaining}초 후 다시 그릴 수 있습니다.
+          </Alert>
+        )}
         <Box
           component="canvas"
           ref={canvasRef}
