@@ -18,30 +18,34 @@ public class PixelHistory {
     private Long id;
 
     @Column(nullable = false)
-    private Integer x;
+    private int x;
 
     @Column(nullable = false)
-    private Integer y;
+    private int y;
 
     @Column(nullable = false, length = 7)
     private String color;
 
-    @Column(name = "user_id")
-    private Long userId;
+    @Column(nullable = false)
+    private Long modifiedBy;
 
-    @Column(name = "modified_at", nullable = false)
+    @Column(nullable = false)
     private LocalDateTime modifiedAt;
 
-    protected PixelHistory() {
-    }
+    public PixelHistory() {}
 
-    public PixelHistory(Integer x, Integer y, String color, Long userId, LocalDateTime modifiedAt) {
+    public PixelHistory(int x, int y, String color, Long modifiedBy, LocalDateTime modifiedAt) {
         this.x = x;
         this.y = y;
         this.color = color;
-        this.userId = userId;
+        this.modifiedBy = modifiedBy;
         this.modifiedAt = modifiedAt;
     }
 
-    // getters omitted for brevity
+    public Long getId() { return id; }
+    public int getX() { return x; }
+    public int getY() { return y; }
+    public String getColor() { return color; }
+    public Long getModifiedBy() { return modifiedBy; }
+    public LocalDateTime getModifiedAt() { return modifiedAt; }
 } 

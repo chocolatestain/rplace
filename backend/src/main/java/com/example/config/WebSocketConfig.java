@@ -11,18 +11,15 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Handshake endpoint: /ws/canvas (SockJS 지원)
-        registry.addEndpoint("/ws/canvas")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        config.enableSimpleBroker("/topic");
+        config.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry registry) {
-        // 클라이언트 구독용 prefix: /topic
-        registry.enableSimpleBroker("/topic");
-        // 서버 수신용 prefix (사용 예정 시) /app
-        registry.setApplicationDestinationPrefixes("/app");
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
     }
 } 

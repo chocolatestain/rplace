@@ -12,7 +12,10 @@
     "react-dom": "^18.2.0",
     "@mui/material": "^5.15.0",
     "@emotion/react": "^11.11.1",
-    "@emotion/styled": "^11.11.0"
+    "@emotion/styled": "^11.11.0",
+    "@reduxjs/toolkit": "^2.0.0",
+    "react-redux": "^9.0.0",
+    "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
