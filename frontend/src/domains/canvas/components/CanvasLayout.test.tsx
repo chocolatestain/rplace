@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 import { store } from '../../../shared/store';
 import CanvasLayout from './CanvasLayout';
 import { axe, toHaveNoViolations } from 'jest-axe';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import '@testing-library/jest-dom';
 import * as pixelApi from '../hooks/usePixelApi';
 import * as canvasSocket from '../hooks/useCanvasSocket';
@@ -51,30 +51,100 @@ describe('CanvasLayout', () => {
 });
 
 describe('CanvasLayout 통합 시나리오', () => {
+  let setPixelMock: ReturnType<typeof vi.fn>;
+  let onPixelEventMock: (event: any) => void;
+
   beforeEach(() => {
-    jest.spyOn(pixelApi, 'usePixelApi').mockReturnValue({
-      setPixel: jest.fn(),
+    setPixelMock = vi.fn();
+    onPixelEventMock = vi.fn();
+    vi.spyOn(pixelApi, 'usePixelApi').mockReturnValue({
+      setPixel: setPixelMock,
       loading: false,
       error: null,
       cooldown: 0,
     });
-    jest.spyOn(canvasSocket, 'useCanvasSocket').mockImplementation(() => {});
-    jest.spyOn(jwtUtil, 'getJwtToken').mockReturnValue('mock-jwt');
+    vi.spyOn(canvasSocket, 'useCanvasSocket').mockImplementation(({ onPixelEvent }: { onPixelEvent: (event: any) => void }) => {
+      // 테스트에서 직접 onPixelEvent를 호출할 수 있도록 mock 저장
+      if (onPixelEvent) onPixelEventMock = onPixelEvent;
+    });
+    vi.spyOn(jwtUtil, 'getJwtToken').mockReturnValue('mock-jwt');
   });
 
-  it('픽셀 클릭 시 REST API 호출이 발생한다', () => {
-    // ... 픽셀 클릭 시 setPixel 호출 여부 확인 ...
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('픽셀 클릭 시 REST API setPixel이 호출된다', () => {
+    render(
+      <Provider store={store}>
+        <CanvasLayout />
+      </Provider>
+    );
+    const canvas = screen.getByLabelText('픽셀 캔버스') as HTMLCanvasElement;
+    fireEvent.mouseDown(canvas, { clientX: 20, clientY: 20 });
+    expect(setPixelMock).toHaveBeenCalledWith({ x: 5, y: 5, color: expect.any(String) });
   });
 
   it('WebSocket 이벤트 수신 시 상태가 반영된다', () => {
-    // ... onPixelEvent mock으로 상태 반영 확인 ...
+    render(
+      <Provider store={store}>
+        <CanvasLayout />
+      </Provider>
+    );
+    // 픽셀 이벤트 mock 호출
+    onPixelEventMock({ x: 1, y: 1, color: '#000000' });
+    const state = store.getState().canvas;
+    expect(state.pixels['1,1']).toEqual({ x: 1, y: 1, color: '#000000' });
   });
 
   it('쿨다운/에러/로딩 UI 피드백이 정상 노출된다', () => {
-    // ... 각 상태별 Alert, CircularProgress 노출 여부 확인 ...
+    vi.spyOn(pixelApi, 'usePixelApi').mockReturnValue({
+      setPixel: setPixelMock,
+      loading: true,
+      error: '에러 발생',
+      cooldown: 3,
+    });
+    render(
+      <Provider store={store}>
+        <CanvasLayout />
+      </Provider>
+    );
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByText('에러 발생')).toBeInTheDocument();
+    expect(screen.getByText(/쿨다운 중/)).toBeInTheDocument();
   });
 
   it('JWT/게스트 분기 동작이 정상이다', () => {
-    // ... getJwtToken mock을 통해 분기 동작 확인 ...
+    vi.spyOn(jwtUtil, 'getJwtToken').mockReturnValueOnce(null); // 게스트
+    render(
+      <Provider store={store}>
+        <CanvasLayout />
+      </Provider>
+    );
+    // 게스트 분기: JWT가 없을 때도 정상 렌더링
+    expect(screen.getByLabelText('픽셀 캔버스')).toBeInTheDocument();
+  });
+
+  it('반응형(모바일/데스크탑) UI가 정상 렌더링된다', () => {
+    // 데스크탑
+    window.innerWidth = 1200;
+    window.dispatchEvent(new Event('resize'));
+    render(
+      <Provider store={store}>
+        <CanvasLayout />
+      </Provider>
+    );
+    expect(screen.getByText('색상 팔레트')).toBeInTheDocument();
+    expect(screen.getByText('쿨다운 타이머')).toBeInTheDocument();
+    // 모바일
+    window.innerWidth = 375;
+    window.dispatchEvent(new Event('resize'));
+    render(
+      <Provider store={store}>
+        <CanvasLayout />
+      </Provider>
+    );
+    expect(screen.getByText('색상 팔레트')).toBeInTheDocument();
+    expect(screen.getByText('쿨다운 타이머')).toBeInTheDocument();
   });
 }); 
