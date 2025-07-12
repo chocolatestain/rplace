@@ -23,7 +23,7 @@ public class CanvasController {
 
     @PostMapping("/api/pixel")
     public ResponseEntity<SetPixelResponse> setPixel(@Valid @RequestBody SetPixelRequest request,
-                                                     @RequestHeader("X-User-Id") Long userId) {
+                                                     long userId) {
         int remaining = canvasService.setPixel(request, userId);
         return ResponseEntity.ok(new SetPixelResponse(remaining));
     }
