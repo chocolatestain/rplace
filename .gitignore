@@ -23,3 +23,6 @@ Thumbs.db
 *.env
 .env 
 docs/canvas-ui-vitest-issue-report.md 
+docs/canvas-realtime-integration-analysis.md 
+docs/task-*.md
+docs/*-analysis.md 
