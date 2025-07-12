@@ -147,4 +147,31 @@ describe('CanvasLayout 통합 시나리오', () => {
     expect(screen.getByText('색상 팔레트')).toBeInTheDocument();
     expect(screen.getByText('쿨다운 타이머')).toBeInTheDocument();
   });
+});
+
+describe('인증 에러 UX', () => {
+  const originalLocation = window.location;
+  beforeEach(() => {
+    // @ts-ignore
+    delete window.location;
+    // @ts-ignore
+    window.location = { href: '' };
+  });
+  afterEach(() => {
+    window.location = originalLocation;
+  });
+  it('인증 만료 시 안내 메시지(링크 포함)와 자동 리다이렉트가 동작한다', () => {
+    vi.spyOn(jwtUtil, 'getJwtToken').mockReturnValue('expired-jwt');
+    vi.spyOn(jwtUtil, 'isJwtExpired').mockReturnValue(true);
+    vi.spyOn(jwtUtil, 'removeJwtToken').mockImplementation(() => {});
+    render(
+      <Provider store={store}>
+        <CanvasLayout />
+      </Provider>
+    );
+    // 인증 만료 안내 메시지(HTML 링크 포함) 노출
+    expect(screen.getByText(/다시 로그인/)).toBeInTheDocument();
+    // 자동 리다이렉트 동작
+    expect(window.location.href).toContain('/login');
+  });
 }); 

@@ -7,7 +7,7 @@ import PalettePanel from './PalettePanel';
 import TimerPanel from './TimerPanel';
 import { usePixelApi } from '../hooks/usePixelApi';
 import { useCanvasSocket } from '../hooks/useCanvasSocket';
-import { getJwtToken, isGuest } from '../../../shared/jwt';
+import { getJwtToken, isGuest, removeJwtToken, isJwtExpired } from '../../../shared/jwt';
 
 const CANVAS_SIZE = 800;
 const GRID_SIZE = 200; // 200x200 바둑판
@@ -20,8 +20,27 @@ const CanvasLayout: React.FC = () => {
     (state: RootState) => state.canvas
   );
   const [isDrawing, setIsDrawing] = useState(false);
+  // 인증 상태 변화 감지용 state
+  const [authState, setAuthState] = useState<'auth' | 'guest'>(isGuest() ? 'guest' : 'auth');
+  // JWT 만료/위조 시 자동 게스트 전환
+  useEffect(() => {
+    const token = getJwtToken();
+    if (!token || isJwtExpired(token)) {
+      removeJwtToken();
+      if (authState !== 'guest') setAuthState('guest');
+    } else {
+      if (authState !== 'auth') setAuthState('auth');
+    }
+  });
+  // jwtToken은 항상 최신 상태로 반영
   const jwtToken = getJwtToken();
-  const { setPixel: apiSetPixel, loading, error, cooldown } = usePixelApi(jwtToken || undefined);
+  const { setPixel: apiSetPixel, loading, error, cooldown } = usePixelApi({
+    jwtToken: jwtToken || undefined,
+    onAuthError: () => {
+      // 인증 만료 시 자동 리다이렉트
+      window.location.href = '/login';
+    },
+  });
 
   // 캔버스 렌더링
   useEffect(() => {
@@ -94,6 +113,14 @@ const CanvasLayout: React.FC = () => {
 
   return (
     <Grid container sx={{ height: '100vh' }}>
+      {/* 인증 상태 안내 */}
+      <Grid item xs={12}>
+        {authState === 'guest' ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            게스트 모드입니다. 일부 기능이 제한될 수 있습니다.
+          </Alert>
+        ) : null}
+      </Grid>
       {/* Palette - left on desktop, top on mobile */}
       <Grid item xs={12} md={2} order={{ xs: 1, md: 1 }}>
         <PalettePanel />
@@ -109,7 +136,11 @@ const CanvasLayout: React.FC = () => {
         {/* 로딩 인디케이터 */}
         {loading && <CircularProgress sx={{ mb: 2 }} />}
         {/* 에러 메시지 */}
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <span dangerouslySetInnerHTML={{ __html: error }} />
+          </Alert>
+        )}
         {/* 쿨다운 안내 */}
         {cooldownRemaining > 0 && (
           <Alert severity="info" sx={{ mb: 2 }}>
