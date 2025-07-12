@@ -31,6 +31,10 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
+    // 테스트용 JWT
+    testImplementation("io.jsonwebtoken:jjwt-api:0.11.5")
+    testRuntimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
+    testRuntimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
     // 서블릿
     compileOnly("jakarta.servlet:jakarta.servlet-api:6.0.0")
 }
