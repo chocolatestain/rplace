@@ -9,6 +9,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.example.shared.JwtUtil.JwtAuthException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -31,5 +32,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse("SERVER_ERROR", ex.getMessage()));
+    }
+
+    @ExceptionHandler(JwtAuthException.class)
+    public ResponseEntity<ErrorResponse> handleJwtAuth(JwtAuthException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponse("UNAUTHORIZED", ex.getMessage()));
     }
 } 

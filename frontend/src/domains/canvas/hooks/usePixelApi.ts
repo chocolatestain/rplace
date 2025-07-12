@@ -42,7 +42,9 @@ export function usePixelApi(options?: UsePixelApiOptions): UsePixelApiResult {
         '/api/pixel',
         params,
         {
-          headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
+          headers: jwtToken
+            ? { Authorization: `Bearer ${jwtToken}` }
+            : {},
         }
       );
       // 서버에서 남은 쿨다운(초) 반환 시 반영
