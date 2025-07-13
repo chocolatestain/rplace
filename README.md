@@ -1,9 +1,5 @@
 # r/place 모노레포
 
-## 문서
-* [모노레포 설계 문서](docs/monorepo-plan.md)
-* [공통 개발 가이드](docs/development-guide.md)
-
 ## 디렉터리 개요
 | 폴더 | 설명 |
 |-------|------|
