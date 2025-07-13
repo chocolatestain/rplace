@@ -141,12 +141,6 @@ const CanvasLayout: React.FC = () => {
             <span dangerouslySetInnerHTML={{ __html: error }} />
           </Alert>
         )}
-        {/* 쿨다운 안내 */}
-        {cooldownRemaining > 0 && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            쿨다운 중: {cooldownRemaining}초 후 다시 그릴 수 있습니다.
-          </Alert>
-        )}
         <Box
           component="canvas"
           ref={canvasRef}
