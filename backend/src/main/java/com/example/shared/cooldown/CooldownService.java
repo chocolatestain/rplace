@@ -30,4 +30,10 @@ public class CooldownService {
         redisTemplate.opsForValue().set(key, "1", Duration.ofSeconds(baseSeconds));
         return baseSeconds;
     }
-} 
+
+    public int getRemainingCooldown(long userId) {
+        String key = "cooldown:" + userId;
+        Long ttl = redisTemplate.getExpire(key, TimeUnit.SECONDS);
+        return (ttl != null && ttl > 0) ? ttl.intValue() : 0;
+    }
+}
